@@ -25,3 +25,8 @@ pip-delete-this-directory.txt
 # Project
 .pytest_cache/
 .coverage
+
+# Development/Test scripts
+test_api.py
+capture_screenshot.py
+capture_swagger.py
