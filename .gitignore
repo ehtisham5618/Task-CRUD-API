@@ -30,3 +30,6 @@ pip-delete-this-directory.txt
 test_api.py
 capture_screenshot.py
 capture_swagger.py
+
+# Database
+tasks.db
