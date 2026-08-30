@@ -161,7 +161,7 @@ This script tests:
 
 ## Author
 
-Created for the FlyRank AI Internship - Week 2 Backend Assignment
+**Ehtisham Abid**
 
 ---
 
