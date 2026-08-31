@@ -31,5 +31,9 @@ test_api.py
 capture_screenshot.py
 capture_swagger.py
 
-# Database
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Legacy database (SQLite - no longer used)
 tasks.db
