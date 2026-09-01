@@ -321,7 +321,7 @@ def public_info():
 def protected_profile(authorization: str = Header(None)):
     """
     Get current user profile - requires valid Bearer token.
-    At this stage, only checks for token presence.
+    Token is verified through Supabase.
     """
     if not authorization:
         raise HTTPException(
@@ -344,7 +344,20 @@ def protected_profile(authorization: str = Header(None)):
             detail="Access token required"
         )
     
-    # For now, just acknowledge the token presence
-    # Actual verification will happen in Stage 3
-    return {"message": "Token received (not yet verified)"}
+    # Verify token with Supabase
+    try:
+        supabase = get_supabase_client()
+        user = supabase.auth.get_user(token)
+        
+        return {
+            "id": user.id,
+            "email": user.email,
+            "created_at": user.created_at
+        }
+    except Exception as e:
+        # Token is invalid, expired, or rejected by Supabase
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token"
+        )
 
