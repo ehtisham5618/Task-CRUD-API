@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, field_validator
 from database import get_db_connection, init_db
+from auth import get_supabase_client
 
 app = FastAPI(title="Task API", version="1.0")
 
@@ -57,6 +58,43 @@ class TaskUpdate(BaseModel):
             raise ValueError("Title cannot be empty or whitespace")
         return v
 
+# Authentication models
+class SignUpRequest(BaseModel):
+    email: str
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def email_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Email cannot be empty")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def password_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Password cannot be empty")
+        return v
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def email_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Email cannot be empty")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def password_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Password cannot be empty")
+        return v
+
 # Root endpoint
 @app.get("/")
 def read_root():
@@ -72,6 +110,63 @@ def read_root():
 def health_check():
     """Check API health status."""
     return {"status": "ok"}
+
+# Authentication endpoints
+@app.post("/auth/signup", status_code=status.HTTP_201_CREATED)
+def signup(request: SignUpRequest):
+    """Create a new user account."""
+    try:
+        supabase = get_supabase_client()
+        auth_response = supabase.auth.sign_up(
+            email=request.email,
+            password=request.password
+        )
+        
+        user = auth_response.user
+        return {
+            "id": user.id,
+            "email": user.email,
+            "created_at": user.created_at
+        }
+    except Exception as e:
+        # Return appropriate error message
+        error_msg = str(e).lower()
+        if "already registered" in error_msg or "user already exists" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Signup failed: {str(e)}"
+        )
+
+@app.post("/auth/login", status_code=status.HTTP_200_OK)
+def login(request: LoginRequest):
+    """Login user and return access token."""
+    try:
+        supabase = get_supabase_client()
+        auth_response = supabase.auth.sign_in_with_password(
+            email=request.email,
+            password=request.password
+        )
+        
+        return {
+            "access_token": auth_response.session.access_token,
+            "refresh_token": auth_response.session.refresh_token
+        }
+    except Exception as e:
+        # Check if it's a credential error
+        error_msg = str(e).lower()
+        if "invalid credentials" in error_msg or "invalid login" in error_msg or "unauthorized" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid login credentials"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid login credentials"
+        )
 
 # Get all tasks
 @app.get("/tasks")
