@@ -1,14 +1,15 @@
-# Task API
+# Task API / Polite Scraper
 
-A CRUD To-Do API built with Python and FastAPI, backed by PostgreSQL, containerized with Docker, and secured with Supabase Auth.
+A CRUD To-Do API built with Python and FastAPI, backed by PostgreSQL, containerized with Docker, secured with Supabase Auth — and extended with a polite web scraping pipeline.
 
 **Assignment Progression:**
 - **Assignment 1**: In-memory CRUD API with REST fundamentals
 - **Assignment 2**: SQLite persistent storage with Git integration
 - **Assignment 3**: PostgreSQL database with Docker containerization
 - **Assignment 4**: Supabase Auth with JWT-based protected routes
+- **Assignment 5**: Polite web scraping pipeline with caching and Pydantic validation
 
-This is Assignment 4, which continues the same repository and adds secure user authentication to the existing Task CRUD API.
+The API work (A1–A4) lives at the repository root. The scraper (A5) lives in `scraper/`.
 
 ## Project Evolution
 
@@ -31,6 +32,13 @@ This is Assignment 4, which continues the same repository and adds secure user a
 - Protected routes using reusable FastAPI dependency injection
 - HTTPBearer security scheme for Swagger UI
 - Existing task CRUD endpoints remain public and unchanged
+
+### A4 -> A5: The Polite Scraper
+- Separate `scraper/` project within the same repository
+- Scrapes first 3 catalogue pages of Books to Scrape (60 books)
+- Caching, 500 ms politeness delay, HTTP status checking
+- Pydantic validation, `books.json`, `errors.json`, `run-report.json`
+- `--test-failure` mode demonstrates one-page failure resilience
 
 ## Project Objectives (Assignment 4)
 
@@ -352,9 +360,19 @@ Task-CRUD-API/
 |-- .env.example             # Environment variables template
 |-- .gitignore               # Git ignore rules
 |-- README.md                # Project documentation
-`-- docs/
-    |-- swagger-ui.png       # Swagger UI screenshot from A3
-    `-- swagger-auth.png     # Swagger UI bearer auth screenshot from A4
+|-- docs/
+|   |-- swagger-ui.png       # Swagger UI screenshot from A3
+|   `-- swagger-auth.png     # Swagger UI bearer auth screenshot from A4
+`-- scraper/                 # Assignment 5 — Polite Scraper
+    |-- src/
+    |   `-- main.py          # Scraping pipeline
+    |-- output/
+    |   |-- books.json       # 60 validated book records
+    |   |-- errors.json      # Validation failures
+    |   `-- run-report.json  # Run metrics
+    |-- requirements.txt     # Scraper dependencies
+    |-- .gitignore           # Ignores cache/ and .venv/
+    `-- README.md            # Scraper documentation
 ```
 
 ## Key Files
