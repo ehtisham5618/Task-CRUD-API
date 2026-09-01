@@ -1,6 +1,7 @@
-from fastapi import FastAPI, HTTPException, status, Header, Depends
-from fastapi.security import HTTPBearer, HTTPAuthenticationCredentials
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, status, Depends
+from fastapi.security import HTTPBearer
+from fastapi.security.http import HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse, Response
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, field_validator
 from database import get_db_connection, init_db
@@ -16,13 +17,13 @@ init_db()
 async def validation_exception_handler(request, exc):
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content={"detail": "Invalid request body"}
+        content={"error": "Invalid request body"}
     )
 
 # Custom exception handler for HTTPException to return "error" field
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
-    if exc.status_code in (404, 401):
+    if exc.status_code in (400, 404, 401):
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": exc.detail}
@@ -97,20 +98,32 @@ class LoginRequest(BaseModel):
         return v
 
 # Auth dependency for protected routes
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
-def verify_token(credentials: HTTPAuthenticationCredentials = Depends(security)):
+def verify_token(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
     """
     Dependency to verify Bearer token through Supabase.
     Returns the verified user object.
     """
+    if (
+        credentials is None
+        or credentials.scheme.lower() != "bearer"
+        or not credentials.credentials
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token required"
+        )
+
     token = credentials.credentials
     
     try:
         supabase = get_supabase_client()
-        user = supabase.auth.get_user(token)
-        return user
-    except Exception as e:
+        user_response = supabase.auth.get_user(token)
+        if user_response is None or user_response.user is None:
+            raise ValueError("Supabase did not return a verified user")
+        return user_response.user
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
@@ -138,10 +151,10 @@ def signup(request: SignUpRequest):
     """Create a new user account."""
     try:
         supabase = get_supabase_client()
-        auth_response = supabase.auth.sign_up(
-            email=request.email,
-            password=request.password
-        )
+        auth_response = supabase.auth.sign_up({
+            "email": request.email,
+            "password": request.password
+        })
         
         user = auth_response.user
         return {
@@ -159,7 +172,7 @@ def signup(request: SignUpRequest):
             )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Signup failed: {str(e)}"
+            detail="Signup failed"
         )
 
 @app.post("/auth/login", status_code=status.HTTP_200_OK)
@@ -167,10 +180,10 @@ def login(request: LoginRequest):
     """Login user and return access token."""
     try:
         supabase = get_supabase_client()
-        auth_response = supabase.auth.sign_in_with_password(
-            email=request.email,
-            password=request.password
-        )
+        auth_response = supabase.auth.sign_in_with_password({
+            "email": request.email,
+            "password": request.password
+        })
         
         return {
             "access_token": auth_response.session.access_token,
@@ -360,11 +373,10 @@ def logout(user=Depends(verify_token)):
     try:
         supabase = get_supabase_client()
         supabase.auth.sign_out()
-        # Return empty response
-        return None
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception:
         # Even if sign_out fails, return 204 as per spec
-        return None
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.get("/protected/dashboard")
 def protected_dashboard(user=Depends(verify_token)):
