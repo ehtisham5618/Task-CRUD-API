@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Header
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, field_validator
@@ -21,7 +21,7 @@ async def validation_exception_handler(request, exc):
 # Custom exception handler for HTTPException to return "error" field
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
-    if exc.status_code == 404:
+    if exc.status_code in (404, 401):
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": exc.detail}
@@ -309,3 +309,42 @@ def delete_task(task_id: int):
     finally:
         cursor.close()
         conn.close()
+
+# Public endpoints
+@app.get("/public/info")
+def public_info():
+    """Get public information - no authentication required."""
+    return {"message": "Welcome stranger! This info is public."}
+
+# Protected endpoints
+@app.get("/protected/profile")
+def protected_profile(authorization: str = Header(None)):
+    """
+    Get current user profile - requires valid Bearer token.
+    At this stage, only checks for token presence.
+    """
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token required"
+        )
+    
+    # Check for Bearer scheme
+    auth_parts = authorization.split()
+    if len(auth_parts) != 2 or auth_parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token required"
+        )
+    
+    token = auth_parts[1]
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token required"
+        )
+    
+    # For now, just acknowledge the token presence
+    # Actual verification will happen in Stage 3
+    return {"message": "Token received (not yet verified)"}
+
