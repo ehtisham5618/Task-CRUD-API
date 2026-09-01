@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, status, Header
+from fastapi import FastAPI, HTTPException, status, Header, Depends
+from fastapi.security import HTTPBearer, HTTPAuthenticationCredentials
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, field_validator
@@ -94,6 +95,26 @@ class LoginRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("Password cannot be empty")
         return v
+
+# Auth dependency for protected routes
+security = HTTPBearer()
+
+def verify_token(credentials: HTTPAuthenticationCredentials = Depends(security)):
+    """
+    Dependency to verify Bearer token through Supabase.
+    Returns the verified user object.
+    """
+    token = credentials.credentials
+    
+    try:
+        supabase = get_supabase_client()
+        user = supabase.auth.get_user(token)
+        return user
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token"
+        )
 
 # Root endpoint
 @app.get("/")
@@ -318,46 +339,38 @@ def public_info():
 
 # Protected endpoints
 @app.get("/protected/profile")
-def protected_profile(authorization: str = Header(None)):
+def protected_profile(user=Depends(verify_token)):
     """
     Get current user profile - requires valid Bearer token.
-    Token is verified through Supabase.
+    Token is verified through Supabase via dependency injection.
     """
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token required"
-        )
-    
-    # Check for Bearer scheme
-    auth_parts = authorization.split()
-    if len(auth_parts) != 2 or auth_parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token required"
-        )
-    
-    token = auth_parts[1]
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token required"
-        )
-    
-    # Verify token with Supabase
+    return {
+        "id": user.id,
+        "email": user.email,
+        "created_at": user.created_at
+    }
+
+@app.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(user=Depends(verify_token)):
+    """
+    Logout authenticated user.
+    Requires valid Bearer token.
+    Returns empty response (204 No Content).
+    """
     try:
         supabase = get_supabase_client()
-        user = supabase.auth.get_user(token)
-        
-        return {
-            "id": user.id,
-            "email": user.email,
-            "created_at": user.created_at
-        }
-    except Exception as e:
-        # Token is invalid, expired, or rejected by Supabase
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
+        supabase.auth.sign_out()
+        # Return empty response
+        return None
+    except Exception:
+        # Even if sign_out fails, return 204 as per spec
+        return None
+
+@app.get("/protected/dashboard")
+def protected_dashboard(user=Depends(verify_token)):
+    """
+    Protected dashboard - demonstrates reusable auth dependency.
+    Requires valid Bearer token (same dependency as /protected/profile).
+    """
+    return {"message": "Protected dashboard access granted"}
 
