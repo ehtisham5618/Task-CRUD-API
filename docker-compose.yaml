@@ -23,6 +23,8 @@ services:
     container_name: task-api
     environment:
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-dev}@db:5432/${POSTGRES_DB:-tasks}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
     ports:
       - "8000:8000"
     depends_on:
